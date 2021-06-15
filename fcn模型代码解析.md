@@ -114,7 +114,7 @@ self._load_state_dict_pre_hooks = OrderedDict()
 self._modules = OrderedDict()
 ```
 `nn.Module`的__init__函数中，初始化了8个有序字典(OrderedDict)用来管理模型相关参数。
-##2.2 FCN模型初始化
+## 2.2 FCN模型初始化
 ```python
 class FCN(nn.Module):
     def __init__(self, num_classes):
@@ -130,7 +130,7 @@ fcn模型初始化需要传入`num_classes`参数，代表最终的分类数。`
 ![](assets/fcn模型代码解析-6e642927.png)  
 ![](assets/fcn模型代码解析-aef6d048.png)
 
-新添加的网络层出现在self的属性之中，依旧有以上四个属性来描述，同属于Module的概念。  
+新添加的网络层出现在self的属性之中，依旧有以上四个属性来描述，同属于Module的概念。 **猜测：对于包含子模块的模块，都是用这四个属性来描述。**
 ![](assets/fcn模型代码解析-a1496618.png)  
 同时self的`_modules`字典中也会出现该模块，说明`stage1`是从属于fcn模型下的子模块。  
 对于具体的模块，比如`self.scores1 = nn.Conv2d(512, num_classes, 1)`其描述如下：  
@@ -139,3 +139,4 @@ fcn模型初始化需要传入`num_classes`参数，代表最终的分类数。`
 ## 2.3模型调用
 
 # 3. 损失函数
+[sunshi ](/损失函数优化器.md)
