@@ -37,7 +37,7 @@ def __getitem__(self, index):
     sample = {'img': img, 'label': label}
     return sample
 ```
-`PIL.Image.open`PIL是python中处理图片的库
+`PIL.Image.open`PIL是python中处理图片的库。一般transform在类外部实现，作为参数传入，是数据预处理的主要流程。
 ### 1.1.3__len__(self)
 ### 1.1.4 center_crop 中心裁剪函数
 功能：裁剪输入PIL图片或者Tensor的大小,返回值也是PIL或者是Tensor格式
@@ -78,3 +78,64 @@ def img_transform(self, img, label):
 
     return img, label
 ```
+其中对于img的处理封装在了`transforms.Compose`中，对于label主要是一个编码处理。img直接作为PIL图像进行处理，label转为了Image对象进行处理，最后在转为tensor。最后输出中img和label都是tensor。
+
+
+## 1.2 Dataloader
+功能：构建可迭代的数据装载器。
+```python
+train_data = DataLoader(Cam_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=0)
+```
+常用参数：
+  - `dataset`：决定从哪里读取数据，就是前边实现的dataset类
+  - `batch_size`：训练数据的批大小。
+  - `num_workers`：是否使用多进程读取数据
+  - `shuffle`：每个epoch是否乱序
+  - `drop_last`：当样本不能被batchsize整除时，是否舍弃最后一批数据
+### 1.2.1__init__函数,DataLoader的初始化
+```python
+torch._C._log_api_usage_once("python.data_loader")#语句作用？？
+```
+
+# 2.FCN模型搭建
+`class FCN(nn.Module):`fcn模型及常用的网络层都继承于`nn.Module`，在pytorch中都是Module的概念。
+## 2.1 nn.Module代码解析
+```python
+self.training = True
+self._parameters = OrderedDict()
+self._buffers = OrderedDict()
+self._non_persistent_buffers_set = set()
+self._backward_hooks = OrderedDict()
+self._is_full_backward_hook = None
+self._forward_hooks = OrderedDict()
+self._forward_pre_hooks = OrderedDict()
+self._state_dict_hooks = OrderedDict()
+self._load_state_dict_pre_hooks = OrderedDict()
+self._modules = OrderedDict()
+```
+`nn.Module`的__init__函数中，初始化了8个有序字典(OrderedDict)用来管理模型相关参数。
+##2.2 FCN模型初始化
+```python
+class FCN(nn.Module):
+    def __init__(self, num_classes):
+      super().__init__()
+```
+fcn模型初始化需要传入`num_classes`参数，代表最终的分类数。`__init__`函数初始化了整个模型所需要的的网络层，随后这些网络层会在`forward`函数中进行拼接。  
+![](assets/fcn模型代码解析-9eb3382c.png)  
+执行父类的__init__()函数过后，出现如图四个属性：
+- `T_destination`：
+- `dump_patchs`：
+- `training`：指示说明模型是出于训练模式还是测试模式，如果处于测试模式则叶子结点不用求取梯度。
+- `protected Attributes`:存放了管理模型的八个有序字典，此时八个字典都为空，字典中只有一个`__len__`元素。  
+![](assets/fcn模型代码解析-6e642927.png)  
+![](assets/fcn模型代码解析-aef6d048.png)
+
+新添加的网络层出现在self的属性之中，依旧有以上四个属性来描述，同属于Module的概念。  
+![](assets/fcn模型代码解析-a1496618.png)  
+同时self的`_modules`字典中也会出现该模块，说明`stage1`是从属于fcn模型下的子模块。  
+对于具体的模块，比如`self.scores1 = nn.Conv2d(512, num_classes, 1)`其描述如下：  
+![](assets/fcn模型代码解析-7e559afb.png)  
+其中的可训练参数为`weight 和 bias`
+## 2.3模型调用
+
+# 3. 损失函数
