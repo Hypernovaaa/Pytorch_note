@@ -125,7 +125,7 @@ fcn模型初始化需要传入`num_classes`参数，代表最终的分类数。`
 执行父类的__init__()函数过后，出现如图四个属性：
 - `T_destination`：
 - `dump_patchs`：
-- `training`：指示说明模型是出于训练模式还是测试模式，如果处于测试模式则叶子结点不用求取梯度。
+- `training`：指示说明模型是出于训练模式还是测试模式，如果处于测试模式则非叶子结点不用求取梯度。
 - `protected Attributes`:存放了管理模型的八个有序字典，此时八个字典都为空，字典中只有一个`__len__`元素。  
 ![](assets/fcn模型代码解析-6e642927.png)  
 ![](assets/fcn模型代码解析-aef6d048.png)
@@ -139,4 +139,48 @@ fcn模型初始化需要传入`num_classes`参数，代表最终的分类数。`
 ## 2.3模型调用
 
 # 3. 损失函数
-[sunshi ](/损失函数优化器.md/#3-2 "优化器2")
+损失函数相当于实现了一个特殊的网络层。
+[损失函数和优化器笔记](/损失函数优化器.md)
+```python
+criterion = nn.NLLLoss().to(device)
+```
+## 3.1 NLLLoss的初始化
+```python
+def __init__(self, weight: Optional[Tensor] = None, size_average=None, ignore_index: int = -100,
+             reduce=None, reduction: str = 'mean') -> None:
+    super(NLLLoss, self).__init__(weight, size_average, reduce, reduction)
+    self.ignore_index = ignore_index
+```
+常用参数：
+- `weight`：为各个类别的loss值设置权值
+- `ignore_index`：设置忽略某个类别
+- `reduction`：loss的计算模式，“none”逐个元素计算，“sum”所有元素求和返回标量，“mean”加权平均然后返回标量。  
+
+NLLLoss的继承关系：`NLLLoss()`->`_WeightedLoss`->`_Loss`->`Module` ，
+`reduction`的设置在`_Loss`中。
+## 3.2 NLLLoss的调用
+```python
+def forward(self, input: Tensor, target: Tensor) -> Tensor:
+    assert self.weight is None or isinstance(self.weight, Tensor)
+    return F.nll_loss(input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
+```
+模型输出数据和标签数据都必须是tensor，同时NLLLoss的返回值也为tensor。
+# 4. 优化器
+```python
+optimizer = optim.Adam(fcn.parameters(), lr=1e-4)
+```
+- fcn.parameters：是一个generater，里面保存了fcn的可训练参数
+## 4.1 优化器初始化
+```python
+class Adam(Optimizer):
+  def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
+                   weight_decay=0, amsgrad=False):
+      defaults = dict(lr=lr, betas=betas, eps=eps,
+                      weight_decay=weight_decay, amsgrad=amsgrad)
+      super(Adam, self).__init__(params, defaults)
+```
+Adam的初始化，将学习率`lr`、`betas`、`eps`、`weight_decay`、`amsgrad`五个参数打包成字典赋值给了`defaults`,随后`params`和`defaults`作为参数来执行父类Optimizer的初始化，Optimizer初始化了四个基本属性用来管理优化器：
+- defaults：就是Adam中的defaults,用来管理优化器的超参数
+- state：参数的缓存，比如momentum需要缓存之前的参数来更新现在的参数
+- params_groups：优化器管理的参数组列表，列表中每一个元素都是字典，字典中的值才是真正要管理的参数。
+- _step_count：记录更新次数，学习率调整时使用
