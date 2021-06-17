@@ -93,10 +93,50 @@ train_data = DataLoader(Cam_train, batch_size=cfg.BATCH_SIZE, shuffle=True, num_
   - `shuffle`：每个epoch是否乱序
   - `drop_last`：当样本不能被batchsize整除时，是否舍弃最后一批数据
 ### 1.2.1__init__函数,DataLoader的初始化
+### 1.2.2dataloader的调用
 ```python
-torch._C._log_api_usage_once("python.data_loader")#语句作用？？
+for i, sample in enumerate(train_data):
 ```
-
+`train_data`在for循环中使用，首先调用`__iter__`函数，随后进行进程判断，调用`self._get_iterator`。`__iter__`函数生成了一个`_BaseDataLoaderIter`的迭代器。
+```python
+def __iter__(self) -> '_BaseDataLoaderIter':
+    if self.persistent_workers and self.num_workers > 0:
+        if self._iterator is None:
+            self._iterator = self._get_iterator()
+        else:
+            self._iterator._reset(self)
+        return self._iterator
+    else:
+        return self._get_iterator()
+```
+随后调用`_BaseDataLoaderIter`中的`__next__`函数。在`__next__`函数中调用`_next_data`：
+```python
+ data = self._next_data()
+```
+在`_next_data`中调用`_next_index`获取所需数据的索引
+```python
+def _next_data(self):
+    index = self._next_index()  # may raise StopIteration
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+    if self._pin_memory:
+        data = _utils.pin_memory.pin_memory(data)
+    return data
+```
+在`_next_index`函数中，进入`BatchSampler`的`__iter__`函数,在`__iter__`函数中将一个batch数据的索引打包成列表，用采样器`sampler`来获取数据索引:
+```python
+def __iter__(self):
+    batch = []
+    for idx in self.sampler:
+        batch.append(idx)
+```
+```python  
+def _next_index(self):
+    return next(self._sampler_iter)
+```
+最后生成的数据为[tensor,...,tensor]:
+```python
+data = [self.dataset[idx] for idx in possibly_batched_index]
+```
 # 2.FCN模型搭建
 `class FCN(nn.Module):`fcn模型及常用的网络层都继承于`nn.Module`，在pytorch中都是Module的概念。
 ## 2.1 nn.Module代码解析
@@ -184,3 +224,59 @@ Adam的初始化，将学习率`lr`、`betas`、`eps`、`weight_decay`、`amsgra
 - state：参数的缓存，比如momentum需要缓存之前的参数来更新现在的参数
 - params_groups：优化器管理的参数组列表，列表中每一个元素都是字典，字典中的值才是真正要管理的参数。
 - _step_count：记录更新次数，学习率调整时使用
+## 4.2 优化器的学习率调整策略
+```python
+print('Epoch is [{}/{}]'.format(epoch + 1, cfg.EPOCH_NUMBER))
+if epoch % 50 == 0 and epoch != 0:
+    for group in optimizer.param_groups:
+        group['lr'] *= 0.5
+```
+`optimizer.param_groups`的lr属性代表的是学习率
+# 5.fcn中的数据流动
+首先从数据装载器`train_data`中获取数据存储在sample中：
+```python
+for i, sample in enumerate(train_data):
+```
+sample为字典格式：  
+![](assets/fcn模型代码解析-e2be821b.png)  
+其中包含组键值对，分别是`img`和`label`其中保存的值如下：
+![](assets/fcn模型代码解析-9a1ce551.png)  
+值保存在`T`和`data`中，其余变量则为描述tensor的属性。 **`T`和`data`的形状是不相同的，为什么？其各自的功能是什么？**  
+![](assets/fcn模型代码解析-cdc8c06b.png)  
+![](assets/fcn模型代码解析-fa89d219.png)   
+随后`img`和`label`分别赋值给了`imgdata`和`img_label`
+```python
+img_data = Variable(sample['img'].to(device))   # [4, 3, 352, 480]
+img_label = Variable(sample['label'].to(device))    # [4, 352, 480]
+```
+`imgdata`送入模型中进行训练：
+```python
+out = net(img_data)     # [4, 12, 352, 480]
+out = F.log_softmax(out, dim=1)#由于是NLLLloss所以要手动计算log_softmax
+```
+## 5.1 模型评估
+```python
+pre_label = out.max(dim=1)[1].data.cpu().numpy()    # (4, 352, 480)
+pre_label = [i for i in pre_label]
+```
+表明获取out的最大值索引，转为data的形式，放在CPU上计算，最后转为numpy的形式。固定写法。
+`max`函数的返回值：
+- 1.最大值本身
+- 2.最大值的索引
+```python
+true_label = img_label.data.cpu().numpy()   # (4, 352, 480)
+true_label = [i for i in true_label]
+```
+真实的标签也做相同的处理。
+```python
+eval_metrix = eval_semantic_segmentation(pre_label, true_label)
+```
+计算混淆矩阵，`eval_semantic_segmentation`接收两个参数：
+- `pre_label`：预测值
+- `true_label`：真实值
+```python
+if max(best) <= train_miou / len(train_data):
+    best.append(train_miou / len(train_data))
+    t.save(net.state_dict(), '{}.pth'.format(epoch))
+```
+训练的最好miou都保存在best列表中，最后用torch自带的方法保存最好的训练权重。
