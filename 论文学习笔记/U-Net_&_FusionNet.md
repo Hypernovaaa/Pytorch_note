@@ -7,4 +7,13 @@ U-Net和FusionNet都是医学分割的模型
 # 3.摘要部分
 ## 3.1 U-Net摘要
 - 提出了一种可以通过数据增强更高效的利用可用样本的网络和训练策略。
-> Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.  
+>  we present a network and training strategy that relies on the strong
+use of data augmentation to use the available annotated samples more
+efficiently  
+
+ - 这种网络架构由一个用来捕获上下文信息的收缩路径，和一个用来精确定位的对称的扩张路径组成。
+ >  The architecture consists of a contracting path to capture
+context and a symmetric expanding path that enables precise localiza-
+tion   
+
+- 
