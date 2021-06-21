@@ -78,7 +78,19 @@ def img_transform(self, img, label):
 
     return img, label
 ```
-其中对于img的处理封装在了`transforms.Compose`中，对于label主要是一个编码处理。img直接作为PIL图像进行处理，label转为了Image对象进行处理，最后在转为tensor。最后输出中img和label都是tensor。
+其中对于img的处理封装在了`transforms.Compose`中，对于label主要是一个编码处理。img直接作为PIL图像进行处理，label转为了Image对象进行处理，最后在转为tensor。最后输出中img和label都是tensor。  
+`label = label_processor.encode_label_img(label)`对label进行哈希编码，传入的label为PIL格式：
+```python
+def encode_label_img(self, img):
+    data = np.array(img, dtype='int32')
+    idx = (data[:, :, 0] * 256 + data[:, :, 1]) * 256 + data[:, :, 2]
+    return np.array(self.cm2lbl[idx], dtype='int64')
+```
+PIL格式的图像经过np.array转换过后维度是[352,480,3]通道数在最后，所以idx是对三个通道上的值进行对应的编码，编码后如下：
+![](assets/fcn模型代码解析-392682b0.png)      
+经过`np.array(self.cm2lbl[idx], dtype='int64')`变换后为：  
+![](assets/fcn模型代码解析-22e525b1.png)  
+
 
 
 ## 1.2 Dataloader
@@ -259,10 +271,14 @@ out = F.log_softmax(out, dim=1)#由于是NLLLloss所以要手动计算log_softma
 pre_label = out.max(dim=1)[1].data.cpu().numpy()    # (4, 352, 480)
 pre_label = [i for i in pre_label]
 ```
-表明获取out的最大值索引，转为data的形式，放在CPU上计算，最后转为numpy的形式。固定写法。
+表明获取out的最大值索引，转为data的形式，放在CPU上计算，最后转为numpy的形式。固定写法。out的输出维度如下：  
+![](assets/fcn模型代码解析-ba6c7560.png)  
+4为batch_size大小，12通道数：没个像素属于这12个类中的概率大小，352x480为图片尺寸。经过`out.max(dim=1)[1].data.cpu().numpy()`转换后维度如下：  
+![](assets/fcn模型代码解析-934ad7a8.png)  
+其中`dim = **`就表示在该维度上经过`log_softmax`变换后相加为1. [log_softmax维度](https://blog.csdn.net/sunyueqinghit/article/details/101113251)  
 `max`函数的返回值：
-- 1.最大值本身
-- 2.最大值的索引
+- 0.最大值本身
+- 1.最大值的索引
 ```python
 true_label = img_label.data.cpu().numpy()   # (4, 352, 480)
 true_label = [i for i in true_label]
