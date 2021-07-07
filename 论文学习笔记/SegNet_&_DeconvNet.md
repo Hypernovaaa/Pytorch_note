@@ -61,7 +61,7 @@
 - Pascal VOC数据集中有少数foreground与background有明显区分，这让一些投机者可以使用类似于边缘检测来刷分数。因此本文使用了Camvid，Sun RGBD这两个数据集，而不是用PascalVOC数据集
 >  the majority of this task has one or two foreground classes surrounded by a highly varied background. This implicitly favours techniques used for detection as shown by the recent work on a decoupled classification-segmentation network [18] where the classification network can be trained with a large set of weakly labelled data and the independent segmentation network performance is improved
 
-##2.2DeconvNet引言
+## 2.2DeconvNet引言
 - cnn的发展和应用
 - 由cnn引出fcn的相关介绍
 - 基于fcn的算法有一些限制；
